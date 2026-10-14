@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack project
-        run: if [ -f io.zip ]; then unzip -o io.zip -x ".github/*"; fi
+        run: unzip -o '*.zip' -x ".github/*" || true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -24,3 +24,4 @@ jobs:
         with:
           name: io-apk
           path: bin/*.apk
+
