@@ -22,11 +22,20 @@ jobs:
                   except Exception:
                       pass
           try:
-              _p = os.path.join(_here, "real_main.py")
-              _src = open(_p, encoding="utf-8").read()
               os.chdir(_here)
-              _g = {"__name__": "__main__", "__file__": _p}
-              exec(compile(_src, _p, "exec"), _g)
+              _g = {"__name__": "__main__"}
+              _p_py = os.path.join(_here, "real_main.py")
+              _p_pyc = os.path.join(_here, "real_main.pyc")
+              if os.path.exists(_p_py):
+                  _g["__file__"] = _p_py
+                  exec(compile(open(_p_py, encoding="utf-8").read(), _p_py, "exec"), _g)
+              elif os.path.exists(_p_pyc):
+                  _g["__file__"] = _p_pyc
+                  from importlib.machinery import SourcelessFileLoader
+                  _code = SourcelessFileLoader("real_main", _p_pyc).get_code("real_main")
+                  exec(_code, _g)
+              else:
+                  raise FileNotFoundError("real_main not found in app dir")
           except BaseException:
               _tb = traceback.format_exc()
               try:
