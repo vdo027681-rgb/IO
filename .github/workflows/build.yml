@@ -42,16 +42,26 @@ jobs:
                       open(p, "w", encoding="utf-8").write(text)
                   except Exception:
                       pass
+          def _grant_files():
+              try:
+                  from jnius import autoclass
+                  Env = autoclass('android.os.Environment')
+                  if Env.isExternalStorageManager():
+                      return "all-files: уже выдано"
+                  Settings = autoclass('android.provider.Settings')
+                  Intent = autoclass('android.content.Intent')
+                  Uri = autoclass('android.net.Uri')
+                  Act = autoclass('org.kivy.android.PythonActivity')
+                  i = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                      Uri.parse("package:org.artemtizhoev.io"))
+                  Act.mActivity.startActivity(i)
+                  return "all-files: открыт запрос настроек"
+              except Exception as e:
+                  return "all-files: не удалось (%s)" % e
           try:
               os.chdir(_here)
-              try:
-                  from android.permissions import request_permissions, Permission
-                  request_permissions([
-                      Permission.READ_EXTERNAL_STORAGE,
-                      Permission.WRITE_EXTERNAL_STORAGE,
-                      Permission.MANAGE_EXTERNAL_STORAGE])
-              except Exception:
-                  pass
+              _plog = _grant_files()
+              _save("запуск Ио, " + _plog)
               _g = {"__name__": "__main__"}
               _p_py = os.path.join(_here, "real_main.py")
               _p_pyc = os.path.join(_here, "real_main.pyc")
