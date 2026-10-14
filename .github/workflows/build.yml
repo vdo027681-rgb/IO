@@ -14,22 +14,27 @@ jobs:
           mv main.py real_main.py
           cat > main.py <<'PYEOF'
           import sys, os, traceback
+          _here = os.path.dirname(os.path.abspath(__file__))
           def _save(text):
-              for p in ("/sdcard/Download/io_crash.log",
-                        os.path.join(os.path.dirname(os.path.abspath(__file__)), "io_crash.log")):
+              for p in ("/sdcard/Download/io_crash.log", os.path.join(_here, "io_crash.log")):
                   try:
                       open(p, "w", encoding="utf-8").write(text)
                   except Exception:
                       pass
           try:
-              _src = open("real_main.py", encoding="utf-8").read()
-              _g = {"__name__": "__main__", "__file__": "real_main.py"}
-              exec(compile(_src, "real_main.py", "exec"), _g)
+              _p = os.path.join(_here, "real_main.py")
+              _src = open(_p, encoding="utf-8").read()
+              os.chdir(_here)
+              _g = {"__name__": "__main__", "__file__": _p}
+              exec(compile(_src, _p, "exec"), _g)
           except BaseException:
               _tb = traceback.format_exc()
+              try:
+                  _tb = _tb + "\n--- files in app dir ---\n" + "\n".join(os.listdir(_here))
+              except Exception:
+                  pass
               _save(_tb)
               try:
-                  import kivy
                   from kivy.app import App
                   from kivy.uix.label import Label
                   class _CrashApp(App):
