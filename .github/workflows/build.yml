@@ -8,6 +8,41 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack project
         run: unzip -o '*.zip' -x ".github/*" || true
+      - name: Diagnostic wrapper
+        run: |
+          if [ -f main.py ] && ! [ -f real_main.py ]; then
+          mv main.py real_main.py
+          cat > main.py <<'PYEOF'
+          import sys, os, traceback
+          def _save(text):
+              for p in ("/sdcard/Download/io_crash.log",
+                        os.path.join(os.path.dirname(os.path.abspath(__file__)), "io_crash.log")):
+                  try:
+                      open(p, "w", encoding="utf-8").write(text)
+                  except Exception:
+                      pass
+          try:
+              _src = open("real_main.py", encoding="utf-8").read()
+              _g = {"__name__": "__main__", "__file__": "real_main.py"}
+              exec(compile(_src, "real_main.py", "exec"), _g)
+          except BaseException:
+              _tb = traceback.format_exc()
+              _save(_tb)
+              try:
+                  import kivy
+                  from kivy.app import App
+                  from kivy.uix.label import Label
+                  class _CrashApp(App):
+                      def build(self):
+                          lbl = Label(text=_tb, font_size="12sp", halign="left", valign="top")
+                          lbl.bind(size=lambda *a: setattr(lbl, "text_size", lbl.size))
+                          return lbl
+                  _CrashApp().run()
+              except Exception:
+                  pass
+              raise
+          PYEOF
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
