@@ -8,10 +8,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack project
         run: unzip -o '*.zip' -x ".github/*" || true
+      - name: Patch permissions
+        run: |
+          if [ -f buildozer.spec ]; then
+            sed -i 's/^#* *android.permissions *=.*/android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE/' buildozer.spec
+            grep -q '^android.permissions' buildozer.spec || echo 'android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
+          fi
       - name: Diagnostic wrapper
         run: |
           if [ -f main.py ] && ! [ -f real_main.py ]; then
           mv main.py real_main.py
+          python3 - <<'PYEOF'
+          s = open('real_main.py', encoding='utf-8').read()
+          old = "sm.add_widget(self._main_screen())"
+          new = ("mainscr = Screen(name='main'); "
+                 "mainscr.add_widget(self._main_screen()); sm.add_widget(mainscr)")
+          if old in s:
+              s = s.replace(old, new)
+              open('real_main.py', 'w', encoding='utf-8').write(s)
+          PYEOF
           cat > main.py <<'PYEOF'
           import sys, os, traceback
           _here = os.path.dirname(os.path.abspath(__file__))
@@ -21,24 +36,8 @@ jobs:
                       open(p, "w", encoding="utf-8").write(text)
                   except Exception:
                       pass
-          def _patch_kivy():
-              try:
-                  from kivy.uix.screenmanager import ScreenManager, Screen
-                  _orig = ScreenManager.add_widget
-                  _counter = [0]
-                  def _add(self, widget, *args, **kwargs):
-                      if not isinstance(widget, Screen):
-                          _counter[0] += 1
-                          s = Screen(name=getattr(widget, "screen_name", None) or "auto_screen_%d" % _counter[0])
-                          s.add_widget(widget)
-                          widget = s
-                      return _orig(self, widget, *args, **kwargs)
-                  ScreenManager.add_widget = _add
-              except Exception:
-                  pass
           try:
               os.chdir(_here)
-              _patch_kivy()
               _g = {"__name__": "__main__"}
               _p_py = os.path.join(_here, "real_main.py")
               _p_pyc = os.path.join(_here, "real_main.pyc")
@@ -89,4 +88,3 @@ jobs:
         with:
           name: io-apk
           path: bin/*.apk
-
