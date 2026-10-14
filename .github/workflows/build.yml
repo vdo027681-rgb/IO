@@ -14,19 +14,27 @@ jobs:
             sed -i 's/^#* *android.permissions *=.*/android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE/' buildozer.spec
             grep -q '^android.permissions' buildozer.spec || echo 'android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE' >> buildozer.spec
           fi
+      - name: Patch UI sizes
+        run: |
+          python3 - <<'PYEOF'
+          s = open('main.py', encoding='utf-8').read()
+          old = "sm.add_widget(self._main_screen())"
+          if old in s:
+              s = s.replace(old, "mainscr = Screen(name='main'); mainscr.add_widget(self._main_screen()); sm.add_widget(mainscr)")
+          s = s.replace("tp.tab_width = 160", "tp.tab_width = 240")
+          s = s.replace("multiline=False, size_hint=(1, None), height=36",
+                        "multiline=False, size_hint=(1, None), height=52, font_size='17sp'")
+          s = s.replace("size_hint=(1, None), height=24, halign='left'",
+                        "size_hint=(1, None), height=34, font_size='15sp', halign='left'")
+          s = s.replace("size_hint=(1, None), height=24)", "size_hint=(1, None), height=34)")
+          s = s.replace("Label(text='журнал обучения:', size_hint=(1, None),\n                height=28, halign='left')",
+                        "Label(text='журнал обучения:', size_hint=(1, None),\n                height=34, font_size='15sp', halign='left')")
+          open('main.py', 'w', encoding='utf-8').write(s)
+          PYEOF
       - name: Diagnostic wrapper
         run: |
           if [ -f main.py ] && ! [ -f real_main.py ]; then
           mv main.py real_main.py
-          python3 - <<'PYEOF'
-          s = open('real_main.py', encoding='utf-8').read()
-          old = "sm.add_widget(self._main_screen())"
-          new = ("mainscr = Screen(name='main'); "
-                 "mainscr.add_widget(self._main_screen()); sm.add_widget(mainscr)")
-          if old in s:
-              s = s.replace(old, new)
-              open('real_main.py', 'w', encoding='utf-8').write(s)
-          PYEOF
           cat > main.py <<'PYEOF'
           import sys, os, traceback
           _here = os.path.dirname(os.path.abspath(__file__))
