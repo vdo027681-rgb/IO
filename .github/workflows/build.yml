@@ -21,8 +21,24 @@ jobs:
                       open(p, "w", encoding="utf-8").write(text)
                   except Exception:
                       pass
+          def _patch_kivy():
+              try:
+                  from kivy.uix.screenmanager import ScreenManager, Screen
+                  _orig = ScreenManager.add_widget
+                  _counter = [0]
+                  def _add(self, widget, *args, **kwargs):
+                      if not isinstance(widget, Screen):
+                          _counter[0] += 1
+                          s = Screen(name=getattr(widget, "screen_name", None) or "auto_screen_%d" % _counter[0])
+                          s.add_widget(widget)
+                          widget = s
+                      return _orig(self, widget, *args, **kwargs)
+                  ScreenManager.add_widget = _add
+              except Exception:
+                  pass
           try:
               os.chdir(_here)
+              _patch_kivy()
               _g = {"__name__": "__main__"}
               _p_py = os.path.join(_here, "real_main.py")
               _p_pyc = os.path.join(_here, "real_main.pyc")
