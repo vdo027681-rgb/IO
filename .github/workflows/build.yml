@@ -1,0 +1,26 @@
+name: Build IO APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project
+        run: if [ -f io.zip ]; then unzip -o io.zip -x ".github/*"; fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip unzip autoconf libtool pkg-config zlib1g-dev openjdk-17-jdk
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+      - name: Install buildozer
+        run: pip install buildozer==1.5.0 cython==0.29.33
+      - name: Build APK
+        run: yes | buildozer -v android debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: io-apk
+          path: bin/*.apk
