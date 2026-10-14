@@ -58,10 +58,26 @@ jobs:
                   return "all-files: открыт запрос настроек"
               except Exception as e:
                   return "all-files: не удалось (%s)" % e
+          def _set_app_locale():
+              try:
+                  from jnius import autoclass
+                  Build = autoclass('android.os.Build')
+                  if int(Build.VERSION.SDK_INT) >= 33:
+                      Context = autoclass('android.content.Context')
+                      LocaleManager = autoclass('android.app.LocaleManager')
+                      LocaleList = autoclass('android.os.LocaleList')
+                      Act = autoclass('org.kivy.android.PythonActivity')
+                      lm = Act.mActivity.getSystemService(Context.LOCALE_SERVICE)
+                      lm.setApplicationLocales(LocaleList.forLanguageTags('ru'))
+                      return "locale: ru установлен"
+                  return "locale: Android < 13, пропущено"
+              except Exception as e:
+                  return "locale: не удалось (%s)" % e
           try:
               os.chdir(_here)
-              _plog = _grant_files()
-              _save("запуск Ио, " + _plog)
+              _llog = _set_app_locale()
+              _glog = _grant_files()
+              _save("запуск Ио, %s, %s" % (_llog, _glog))
               _g = {"__name__": "__main__"}
               _p_py = os.path.join(_here, "real_main.py")
               _p_pyc = os.path.join(_here, "real_main.pyc")
