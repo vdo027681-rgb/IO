@@ -27,6 +27,11 @@ jobs:
           s = s.replace("size_hint=(1, None), height=24, halign='left'",
                         "size_hint=(1, None), height=34, font_size='15sp', halign='left'")
           s = s.replace("size_hint=(1, None), height=24)", "size_hint=(1, None), height=34)")
+          # словарь: 1500 -> 5000 лемм
+          s = s.replace("MAXV = 1500", "MAXV = 5000")
+          # память: домашняя папка (/data) -> папка приложения
+          s = s.replace("os.path.expanduser('~'), 'io_state.pkl'",
+                        "os.path.dirname(os.path.abspath(__file__)), 'io_state.pkl'")
           old = "lbl = Label(text='by Artem Tizhoev', font_size='13sp',"
           new = ("_diag = ''\n"
                  "            try:\n"
@@ -38,6 +43,7 @@ jobs:
                  "            lbl = Label(text='by Artem Tizhoev  ' + _diag, font_size='11sp',")
           s = s.replace(old, new)
           open('main.py', 'w', encoding='utf-8').write(s)
+          print('патч применён')
           PYEOF
       - name: Diagnostic wrapper
         run: |
@@ -56,14 +62,23 @@ jobs:
               try:
                   from jnius import autoclass
                   Build = autoclass('android.os.Build')
-                  if int(Build.VERSION.SDK_INT) >= 33:
+                  sdk = int(Build.VERSION.SDK_INT)
+                  if sdk >= 33:
                       Context = autoclass('android.content.Context')
                       LocaleList = autoclass('android.os.LocaleList')
                       Act = autoclass('org.kivy.android.PythonActivity')
                       lm = Act.mActivity.getSystemService(Context.LOCALE_SERVICE)
                       lm.setApplicationLocales(LocaleList.forLanguageTags('ru'))
-                      return "locale: ru установлен"
-                  return "locale: Android %d, без LocaleManager" % int(Build.VERSION.SDK_INT)
+                      return "locale: ru установлен (API 33+)"
+                  Locale = autoclass('java.util.Locale')
+                  Conf = autoclass('android.content.res.Configuration')
+                  Act = autoclass('org.kivy.android.PythonActivity')
+                  act = Act.mActivity
+                  res = act.getResources()
+                  conf = res.getConfiguration()
+                  conf.setLocale(Locale('ru'))
+                  res.updateConfiguration(conf, res.getDisplayMetrics())
+                  return "locale: ru через Configuration (API %d)" % sdk
               except Exception as e:
                   return "locale: не удалось (%s)" % e
           def _grant_files():
