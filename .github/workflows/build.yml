@@ -14,7 +14,7 @@ jobs:
             sed -i 's/^#* *android.permissions *=.*/android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE/' buildozer.spec
             grep -q '^android.permissions' buildozer.spec || echo 'android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE' >> buildozer.spec
           fi
-      - name: Patch UI sizes
+      - name: Patch code
         run: |
           python3 - <<'PYEOF'
           s = open('main.py', encoding='utf-8').read()
@@ -27,6 +27,16 @@ jobs:
           s = s.replace("size_hint=(1, None), height=24, halign='left'",
                         "size_hint=(1, None), height=34, font_size='15sp', halign='left'")
           s = s.replace("size_hint=(1, None), height=24)", "size_hint=(1, None), height=34)")
+          old = "lbl = Label(text='by Artem Tizhoev', font_size='13sp',"
+          new = ("_diag = ''\n"
+                 "            try:\n"
+                 "                _f = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'io_crash.log'), encoding='utf-8')\n"
+                 "                _diag = _f.read()[:250]\n"
+                 "                _f.close()\n"
+                 "            except Exception:\n"
+                 "                _diag = 'лог не записан'\n"
+                 "            lbl = Label(text='by Artem Tizhoev  ' + _diag, font_size='11sp',")
+          s = s.replace(old, new)
           open('main.py', 'w', encoding='utf-8').write(s)
           PYEOF
       - name: Diagnostic wrapper
@@ -37,11 +47,25 @@ jobs:
           import sys, os, traceback
           _here = os.path.dirname(os.path.abspath(__file__))
           def _save(text):
-              for p in ("/sdcard/Download/io_crash.log", os.path.join(_here, "io_crash.log")):
+              for p in ("/sdcard/Download/io_crash.log", os.path.join(_here, "io_crash.log"), os.path.join(os.path.expanduser("~"), "io_crash.log")):
                   try:
                       open(p, "w", encoding="utf-8").write(text)
                   except Exception:
                       pass
+          def _set_app_locale():
+              try:
+                  from jnius import autoclass
+                  Build = autoclass('android.os.Build')
+                  if int(Build.VERSION.SDK_INT) >= 33:
+                      Context = autoclass('android.content.Context')
+                      LocaleList = autoclass('android.os.LocaleList')
+                      Act = autoclass('org.kivy.android.PythonActivity')
+                      lm = Act.mActivity.getSystemService(Context.LOCALE_SERVICE)
+                      lm.setApplicationLocales(LocaleList.forLanguageTags('ru'))
+                      return "locale: ru установлен"
+                  return "locale: Android %d, без LocaleManager" % int(Build.VERSION.SDK_INT)
+              except Exception as e:
+                  return "locale: не удалось (%s)" % e
           def _grant_files():
               try:
                   from jnius import autoclass
@@ -58,21 +82,6 @@ jobs:
                   return "all-files: открыт запрос настроек"
               except Exception as e:
                   return "all-files: не удалось (%s)" % e
-          def _set_app_locale():
-              try:
-                  from jnius import autoclass
-                  Build = autoclass('android.os.Build')
-                  if int(Build.VERSION.SDK_INT) >= 33:
-                      Context = autoclass('android.content.Context')
-                      LocaleManager = autoclass('android.app.LocaleManager')
-                      LocaleList = autoclass('android.os.LocaleList')
-                      Act = autoclass('org.kivy.android.PythonActivity')
-                      lm = Act.mActivity.getSystemService(Context.LOCALE_SERVICE)
-                      lm.setApplicationLocales(LocaleList.forLanguageTags('ru'))
-                      return "locale: ru установлен"
-                  return "locale: Android < 13, пропущено"
-              except Exception as e:
-                  return "locale: не удалось (%s)" % e
           try:
               os.chdir(_here)
               _llog = _set_app_locale()
